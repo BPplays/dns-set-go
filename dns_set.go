@@ -19,7 +19,7 @@ type Auth struct {
 }
 
 type DnsAPI interface {
-	New(Auth) DnsAPI
+	setAuth(Auth) DnsAPI
 
 	setDns(Record) error
 	getDns(string) ([]Record, error)

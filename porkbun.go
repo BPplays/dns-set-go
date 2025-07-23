@@ -8,7 +8,7 @@ type Porkbun struct {
 	self *porkbun.Client
 }
 
-func (p Porkbun) New(a Auth) DnsAPI {
+func (p Porkbun) setAuth(a Auth) DnsAPI {
 
 	p.self = porkbun.New(a.api_secret_key, a.api_key)
 	return p
