@@ -1,6 +1,8 @@
 package dns_set
 
 import (
+	"context"
+
 	"github.com/nrdcg/porkbun"
 )
 
@@ -14,10 +16,10 @@ func (p Porkbun) setAuth(a Auth) DnsAPI {
 	return p
 }
 
-func (p Porkbun) setDns(record Record) error {
+func (p Porkbun) setDns(ctx context.Context, records []Record) error {
 	return nil
 }
 
-func (p Porkbun) getDns(s string) ([]Record, error) {
+func (p Porkbun) getDns(ctx context.Context, s string) ([]Record, error) {
 	return []Record{}, nil
 }

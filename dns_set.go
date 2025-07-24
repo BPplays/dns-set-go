@@ -1,5 +1,11 @@
 package dns_set
 
+import "context"
+
+var Providers = map[string]DnsAPI{
+	"porkbun": Porkbun{},
+}
+
 type Record struct {
 	Name    string
 	Disabled    bool
@@ -21,12 +27,13 @@ type Auth struct {
 type DnsAPI interface {
 	setAuth(Auth) DnsAPI
 
-	setDns(Record) error
-	getDns(string) ([]Record, error)
+	setDns(context.Context, []Record) error
+	getDns(context.Context, string) ([]Record, error)
 }
 
 
 func main() {
+
 
 
 }
