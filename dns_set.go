@@ -15,20 +15,25 @@ type Record struct {
 	Prio    string
 	Notes   string
 }
+func (r *Record) SetDefaults() {
+    if r.TTL == "" {
+        r.TTL = "300"
+    }
+}
 
 type Auth struct {
-	username string
-	password string
+	Username string
+	Password string
 
-	api_key string
-	api_secret_key string
+	ApiKey string
+	ApiSecretKey string
 }
 
 type DnsAPI interface {
-	setAuth(Auth) DnsAPI
+	SetAuth(Auth) DnsAPI
 
-	setDns(context.Context, []Record) error
-	getDns(context.Context, string) ([]Record, error)
+	SetDns(context.Context, []Record) error
+	GetDns(context.Context, string) ([]Record, error)
 }
 
 

@@ -2,6 +2,7 @@ package sddns
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"log"
 	"net"
@@ -35,6 +36,7 @@ type Service struct {
     IPv6Interfaces []string `yaml:"ipv6_interfaces"`
     IPv4Type       string   `yaml:"ipv4_type"`
     IPv4Interfaces []string `yaml:"ipv4_interfaces"`
+    TTL string `yaml:"ttl"`
     APIKey         string   `yaml:"api_key"`
     APISecretKey   string   `yaml:"api_secret_key"`
     Username       string   `yaml:"username"`
@@ -209,6 +211,65 @@ func loadConfig(configLocation *string) []Service {
 	return allServices
 }
 
+func setRecords(ctx context.Context, configs []Service) {
+	var err error
+
+	for _, config := range configs {
+		pv := dnsSet.Providers[config.Type]
+		pv.SetAuth(dnsSet.Auth{
+			ApiKey: config.APIKey,
+			ApiSecretKey: config.APISecretKey,
+			Username: config.Username,
+			Password: config.Password,
+		})
+		var ips6, ips4 []string
+
+		if config.IPv6Type == "interfaces" {
+			ips6, err = getIPaddresses(config.IPv6Interfaces, isIPv6)
+			if err != nil {
+				log.Printf("error %v", err)
+			}
+
+		}
+
+		if config.IPv4Type == "interfaces" {
+			ips4, err = getIPaddresses(config.IPv4Interfaces, isIPv4)
+			if err != nil {
+				log.Printf("error %v", err)
+			}
+		}
+
+
+		var records []dnsSet.Record
+		for _, host := range config.Hostnames {
+			for _, ip := range ips6 {
+				record := dnsSet.Record{
+					Name: host,
+					Content: ip,
+					Type: "AAAA",
+					TTL: config.TTL,
+				}
+				record.SetDefaults()
+				records = append(records, record)
+			}
+
+			for _, ip := range ips4 {
+				record := dnsSet.Record{
+					Name: host,
+					Content: ip,
+					Type: "A",
+					TTL: config.TTL,
+				}
+				record.SetDefaults()
+				records = append(records, record)
+			}
+		}
+
+		pv.SetDns(ctx, records)
+	}
+
+}
+
 func Run(ctx context.Context, configLocation *string, logger *log.Logger) {
 	select {
 	case <-ctx.Done():
@@ -216,8 +277,8 @@ func Run(ctx context.Context, configLocation *string, logger *log.Logger) {
 		return
 	default:
 		for {
-			config := loadConfig(configLocation)
-			pv := dnsSet.Providers[config]
+			configs := loadConfig(configLocation)
+			setRecords(ctx, configs)
 
 			time.Sleep(20 * time.Second)
 		}
