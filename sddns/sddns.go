@@ -244,7 +244,7 @@ func setRecords(ctx context.Context, configs []Service) {
 		for _, host := range config.Hostnames {
 			for _, ip := range ips6 {
 				record := dnsSet.Record{
-					Name: host,
+					Hostname: host,
 					Content: ip,
 					Type: "AAAA",
 					TTL: config.TTL,
@@ -255,7 +255,7 @@ func setRecords(ctx context.Context, configs []Service) {
 
 			for _, ip := range ips4 {
 				record := dnsSet.Record{
-					Name: host,
+					Hostname: host,
 					Content: ip,
 					Type: "A",
 					TTL: config.TTL,

@@ -7,6 +7,7 @@ var Providers = map[string]DnsAPI{
 }
 
 type Record struct {
+	Domain    string
 	Name    string
 	Disabled    bool
 	Type    string
@@ -33,12 +34,6 @@ type DnsAPI interface {
 	SetAuth(Auth) DnsAPI
 
 	SetDns(context.Context, []Record) error
-	GetDns(context.Context, string) ([]Record, error)
+	GetDns(context.Context, []string) ([]Record, error)
 }
 
-
-func main() {
-
-
-
-}
