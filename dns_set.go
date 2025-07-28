@@ -35,5 +35,6 @@ type DnsAPI interface {
 
 	SetDns(context.Context, []Record) error
 	GetDns(context.Context, []string) ([]Record, error)
+	GetSuppoertedRecords() ([]string, error)
 }
 
