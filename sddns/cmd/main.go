@@ -10,12 +10,15 @@ import (
 )
 
 func main() {
-	configLocation := flag.String("config_location", sddns.ConfigLocationDefault, "")
+	configLocation := flag.String("config_dir", sddns.ConfigLocationDefault, "")
 	timeout := flag.Int("timeout_sec", 25, "")
 
-		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(*timeout) * time.Second)
-		defer cancel()
+	flag.Parse()
 
-		sddns.Run(ctx, configLocation, log.Default())
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(*timeout) * time.Second)
+	defer cancel()
+
+	log.Println("running sddns")
+	sddns.Run(ctx, configLocation, log.Default())
 
 }

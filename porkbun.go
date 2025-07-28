@@ -22,7 +22,6 @@ type pb_dom_rec struct {
 }
 
 func (p Porkbun) SetAuth(a Auth) DnsAPI {
-
 	p.self = porkbun.New(a.ApiSecretKey, a.ApiKey)
 	return p
 }
@@ -55,14 +54,14 @@ func (p Porkbun) inGetDns(ctx context.Context, hostnames []string) ([]pb_dom_rec
 
     for _, hostname := range hostnames {
         wg.Add(1)
-        go func(host string) {
+        go func(p Porkbun, host string) {
             defer wg.Done()
             recs, err := p.self.RetrieveRecords(ctx, host)
             if err != nil {
                 return
             }
             existingRecChan <- pb_dom_rec{host, recs}
-        }(hostname)
+        }(p, hostname)
     }
 
     go func() {
@@ -181,16 +180,16 @@ func (p Porkbun) inSetDns(ctx context.Context, records []Record) error {
 	}
 
 
-	existingRecMap := make(map[string]*[]porkbun.Record)
+	existingRecMap := make(map[string][]porkbun.Record)
 
 	for _, eRec := range existingRecs {
-		(*existingRecMap[eRec.domain]) = append((*existingRecMap[eRec.domain]), eRec.records...)
+		existingRecMap[eRec.domain] = append(existingRecMap[eRec.domain], eRec.records...)
 	}
 
-	recMap := make(map[string]*[]Record)
+	recMap := make(map[string][]Record)
 
 	for _, rec := range records {
-		(*recMap[rec.Domain]) = append((*recMap[rec.Domain]), rec)
+		recMap[rec.Domain] = append(recMap[rec.Domain], rec)
 	}
 
 
@@ -215,7 +214,7 @@ func (p Porkbun) inSetDns(ctx context.Context, records []Record) error {
 			)
 
 
-		}(ctx, domain, (*recMap[domain]), (*existingRecMap[domain]))
+		}(ctx, domain, recMap[domain], existingRecMap[domain])
 	}
 	wg.Wait()
 
@@ -257,7 +256,7 @@ func (p Porkbun) GetDns(ctx context.Context, hostnames []string) ([]Record, erro
 }
 
 
-func (p Porkbun) GetSuppoertedRecords() ([]string) {
+func (p Porkbun) GetSuppoertedRecords() ([]string, error) {
 	return []string{
 		"AAAA",
 		"A",
@@ -269,5 +268,5 @@ func (p Porkbun) GetSuppoertedRecords() ([]string) {
 		"SRV",
 		"TLSA",
 		"CAA",
-	}
+	}, nil
 }

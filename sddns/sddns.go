@@ -215,14 +215,26 @@ func setRecords(ctx context.Context, configs []Service) {
 	var err error
 
 	for _, config := range configs {
-		pv := dnsSet.Providers[config.Type]
-		pv.SetAuth(dnsSet.Auth{
+		pv, ok := dnsSet.Providers[config.Type]
+		if !ok {
+			log.Fatalf("no DNS provider registered for type %q", config.Type)
+		}
+		if pv == nil {
+			log.Println(pv)
+			log.Println(dnsSet.Providers)
+			log.Fatalln("no provider")
+		}
+
+
+		log.Println("f")
+		pv = pv.SetAuth(dnsSet.Auth{
 			ApiKey: config.APIKey,
 			ApiSecretKey: config.APISecretKey,
 			Username: config.Username,
 			Password: config.Password,
 		})
 		var ips6, ips4 []string
+		log.Println("pv val", pv)
 
 		if config.IPv6Type == "interfaces" {
 			ips6, err = getIPaddresses(config.IPv6Interfaces, isIPv6)
@@ -238,6 +250,8 @@ func setRecords(ctx context.Context, configs []Service) {
 				log.Printf("error %v", err)
 			}
 		}
+
+		// log.Println("ips6:", ips6)
 
 
 		var records []dnsSet.Record
@@ -265,6 +279,8 @@ func setRecords(ctx context.Context, configs []Service) {
 			}
 		}
 
+		// log.Println("records:", records)
+
 		pv.SetDns(ctx, records)
 	}
 
@@ -277,7 +293,10 @@ func Run(ctx context.Context, configLocation *string, logger *log.Logger) {
 		return
 	default:
 		for {
+
+			log.Println("loading config")
 			configs := loadConfig(configLocation)
+			log.Println("settings records")
 			setRecords(ctx, configs)
 
 			time.Sleep(20 * time.Second)

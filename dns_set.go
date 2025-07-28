@@ -2,9 +2,11 @@ package dns_set
 
 import "context"
 
+
 var Providers = map[string]DnsAPI{
-	"porkbun": Porkbun{},
+	"porkbun": &Porkbun{},
 }
+
 
 type Record struct {
 	Domain    string
