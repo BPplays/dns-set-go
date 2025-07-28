@@ -242,7 +242,17 @@ func (p Porkbun) GetDns(ctx context.Context, hostnames []string) ([]Record, erro
 		fmt.Println("Task cancelled")
 		return []Record{}, ctx.Err()
 	default:
-		return p.inGetDns(ctx, hostnames)
+		pbRecs, err := p.inGetDns(ctx, hostnames)
+		if err != nil { return []Record{}, err }
+
+		var recs []Record
+		for _, pdrec := range pbRecs {
+			for _, prec := range pdrec.records {
+				recs = append(recs, p.pbRecToBaseRec(pdrec.domain, prec))
+			}
+		}
+
+		return recs, nil
 	}
 }
 
