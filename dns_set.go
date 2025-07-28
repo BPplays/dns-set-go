@@ -10,7 +10,7 @@ var Providers = map[string]DnsAPI{
 
 type Record struct {
 	Domain    string
-	Name    string
+	Subdomain    string
 	Disabled    bool
 	Type    string
 	Content string
@@ -18,6 +18,7 @@ type Record struct {
 	Prio    string
 	Notes   string
 }
+
 func (r *Record) SetDefaults() {
     if r.TTL == "" {
         r.TTL = "300"

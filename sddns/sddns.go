@@ -28,10 +28,17 @@ var (
 	ConfigLocationDefault = filepath.Join(BaseLocationDefault, "config.d")
 )
 
+
+type subDomain struct {
+    Domains           string   `yaml:"domain"`
+    Subdomains           []string   `yaml:"sub_domains"`
+}
+
+
 type Service struct {
     Name           string   `yaml:"name"`
     Type           string   `yaml:"type"`
-    Hostnames      []string `yaml:"hostnames"`
+    Domains      []subDomain `yaml:"domains"`
     IPv6Type       string   `yaml:"ipv6_type"`
     IPv6Interfaces []string `yaml:"ipv6_interfaces"`
     IPv4Type       string   `yaml:"ipv4_type"`
@@ -226,7 +233,6 @@ func setRecords(ctx context.Context, configs []Service) {
 		}
 
 
-		log.Println("f")
 		pv = pv.SetAuth(dnsSet.Auth{
 			ApiKey: config.APIKey,
 			ApiSecretKey: config.APISecretKey,
@@ -255,27 +261,33 @@ func setRecords(ctx context.Context, configs []Service) {
 
 
 		var records []dnsSet.Record
-		for _, host := range config.Hostnames {
-			for _, ip := range ips6 {
-				record := dnsSet.Record{
-					Domain: host,
-					Content: ip,
-					Type: "AAAA",
-					TTL: config.TTL,
-				}
-				record.SetDefaults()
-				records = append(records, record)
-			}
+		for _, domain := range config.Domains {
 
-			for _, ip := range ips4 {
-				record := dnsSet.Record{
-					Domain: host,
-					Content: ip,
-					Type: "A",
-					TTL: config.TTL,
+			for _, subd := range domain.Subdomains {
+				for _, ip := range ips6 {
+					record := dnsSet.Record{
+						Domain: domain.Domains,
+						Subdomain: subd,
+						Content: ip,
+						Type: "AAAA",
+						TTL: config.TTL,
+					}
+					record.SetDefaults()
+					records = append(records, record)
 				}
-				record.SetDefaults()
-				records = append(records, record)
+
+				for _, ip := range ips4 {
+					record := dnsSet.Record{
+						Domain: domain.Domains,
+						Subdomain: subd,
+						Content: ip,
+						Type: "A",
+						TTL: config.TTL,
+					}
+					record.SetDefaults()
+					records = append(records, record)
+				}
+
 			}
 		}
 

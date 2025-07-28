@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/netip"
+	"slices"
 	"strconv"
 	"sync"
 
@@ -78,7 +79,7 @@ func (p Porkbun) inGetDns(ctx context.Context, hostnames []string) ([]pb_dom_rec
 
 func (p Porkbun) baseRecToPbRec(r Record) porkbun.Record {
 	return porkbun.Record{
-		Name: r.Name,
+		Name: r.Hostname,
 		Type: r.Type,
 		Content: r.Content,
 		TTL: r.TTL,
@@ -90,7 +91,7 @@ func (p Porkbun) baseRecToPbRec(r Record) porkbun.Record {
 func (p Porkbun) pbRecToBaseRec(domain string, r porkbun.Record) Record {
 	return Record{
 		Domain: domain,
-		Name: r.Name,
+		Hostname: r.Name,
 		Type: r.Type,
 		Content: r.Content,
 		TTL: r.TTL,
@@ -107,9 +108,9 @@ func (p Porkbun) inSetSingleName(ctx context.Context, domain string, records []R
 	for _, rec := range records {
 		recExists[rec] = false
 	}
-	for _, rec := range existingRecs.records {
-		recExists[p.pbRecToBaseRec(existingRecs.domain, rec)] = false
-	}
+	// for _, rec := range existingRecs.records {
+	// 	recExists[p.pbRecToBaseRec(existingRecs.domain, rec)] = false
+	// }
 
 
 	for _, rec := range records {
@@ -117,6 +118,8 @@ func (p Porkbun) inSetSingleName(ctx context.Context, domain string, records []R
 			if rec == p.pbRecToBaseRec(rec.Domain, eRec) { recExists[rec] = true; }
 		}
 	}
+
+	log.Println("recEx", recExists)
 
 
 
@@ -132,6 +135,7 @@ func (p Porkbun) inSetSingleName(ctx context.Context, domain string, records []R
 		}
 		pbRec := p.baseRecToPbRec(rec)
 
+		log.Println("making record")
 		id, err := p.self.CreateRecord(ctx, rec.Domain, pbRec)
 		if err != nil {
 			return err
@@ -149,6 +153,7 @@ func (p Porkbun) inSetSingleName(ctx context.Context, domain string, records []R
 			return err
 		}
 
+		log.Println("deleting")
 		err = p.self.DeleteRecord(ctx, existingRecs.domain, id)
 		if err != nil {
 			return err
@@ -164,6 +169,7 @@ func (p Porkbun) inSetSingleName(ctx context.Context, domain string, records []R
 				id, err := strconv.Atoi(existingRecs.records[i].ID)
 				if err != nil { return err }
 
+				log.Println("editing record")
 				p.self.EditRecord(ctx, domain, id, eRec)
 			}
 		}
@@ -196,6 +202,7 @@ func (p Porkbun) inSetDns(ctx context.Context, records []Record) error {
 
 	var domains []string
 	for _, rec := range records {
+		if slices.Contains(domains, rec.Domain) { continue }
 		domains = append(domains, rec.Domain)
 	}
 
