@@ -18,7 +18,7 @@ type Porkbun struct {
 }
 
 type pb_dom_rec struct {
-	domain string
+	domain DomainSub
 	records []porkbun.Record
 }
 
@@ -41,28 +41,29 @@ func IPv6ToReverseDNS(ip netip.Prefix) string {
 	return revdns
 }
 
-func recordsToHostnames(r []Record) (hostnames []string) {
+func recordsToDomains(r []Record) (domains []DomainSub) {
 	for _, rec := range r {
-		hostnames = append(hostnames, rec.Domain)
+		domains = append(domains, DomainSub{rec.Domain, rec.Subdomain})
 	}
-	return hostnames
+	return domains
 }
 
-func (p Porkbun) inGetDns(ctx context.Context, hostnames []string) ([]pb_dom_rec, error) {
+func (p Porkbun) inGetDns(ctx context.Context, domains []DomainSub) ([]pb_dom_rec, error) {
     var wg sync.WaitGroup
     existingRecChan := make(chan pb_dom_rec)
-    pbRecs := make([]pb_dom_rec, 0, len(hostnames))
+    pbRecs := make([]pb_dom_rec, 0, len(domains))
 
-    for _, hostname := range hostnames {
+    for _, domain := range domains {
         wg.Add(1)
-        go func(p Porkbun, host string) {
+        go func(p Porkbun, domain DomainSub) {
             defer wg.Done()
-            recs, err := p.self.RetrieveRecords(ctx, host)
+            recs, err := p.self.RetrieveRecords(ctx, domain.Domain)
             if err != nil {
                 return
             }
-            existingRecChan <- pb_dom_rec{host, recs}
-        }(p, hostname)
+
+            existingRecChan <- pb_dom_rec{domain.full(), recs}
+        }(p, domain)
     }
 
     go func() {
@@ -79,7 +80,7 @@ func (p Porkbun) inGetDns(ctx context.Context, hostnames []string) ([]pb_dom_rec
 
 func (p Porkbun) baseRecToPbRec(r Record) porkbun.Record {
 	return porkbun.Record{
-		Name: r.Hostname,
+		Name: r.Subdomain,
 		Type: r.Type,
 		Content: r.Content,
 		TTL: r.TTL,
@@ -89,15 +90,17 @@ func (p Porkbun) baseRecToPbRec(r Record) porkbun.Record {
 }
 
 func (p Porkbun) pbRecToBaseRec(domain string, r porkbun.Record) Record {
-	return Record{
+	rec := Record{
 		Domain: domain,
-		Hostname: r.Name,
+		Subdomain: r.Name,
 		Type: r.Type,
 		Content: r.Content,
 		TTL: r.TTL,
 		Prio: r.Prio,
 		Notes: r.Notes,
 	}
+	rec.SetDefaults()
+	return rec
 }
 
 func (p Porkbun) inSetSingleName(ctx context.Context, domain string, records []Record, existingRecs pb_dom_rec) error {
@@ -119,7 +122,11 @@ func (p Porkbun) inSetSingleName(ctx context.Context, domain string, records []R
 		}
 	}
 
+	fmt.Println()
 	log.Println("recEx", recExists)
+	fmt.Println()
+	log.Println("recExisting", existingRecs.records)
+	fmt.Println()
 
 
 
@@ -129,15 +136,18 @@ func (p Porkbun) inSetSingleName(ctx context.Context, domain string, records []R
 		eRecMapCheck[p.pbRecToBaseRec(existingRecs.domain, eRec)] = true
 	}
 
+	log.Println("existing records:", existingRecs.records)
+
 	for _, rec := range records {
 		if len(existingRecs.records) >= len(records) {
 			break
 		}
 		pbRec := p.baseRecToPbRec(rec)
 
-		log.Println("making record")
+		log.Printf("making record: %v, %v\n", rec.Domain, pbRec)
 		id, err := p.self.CreateRecord(ctx, rec.Domain, pbRec)
 		if err != nil {
+			log.Println(err)
 			return err
 		}
 		pbRec.ID = strconv.Itoa(id)
@@ -180,10 +190,13 @@ func (p Porkbun) inSetSingleName(ctx context.Context, domain string, records []R
 }
 
 func (p Porkbun) inSetDns(ctx context.Context, records []Record) error {
-	existingRecs, err := p.inGetDns(ctx, recordsToHostnames(records))
+	existingRecs, err := p.inGetDns(ctx, recordsToDomains(records))
 	if err != nil {
 		log.Println("error", err)
 	}
+
+
+	log.Println("all pbdomrecs:", existingRecs)
 
 
 	existingRecMap := make(map[string][]porkbun.Record)
@@ -200,10 +213,10 @@ func (p Porkbun) inSetDns(ctx context.Context, records []Record) error {
 
 
 
-	var domains []string
+	var domains []DomainSub
 	for _, rec := range records {
-		if slices.Contains(domains, rec.Domain) { continue }
-		domains = append(domains, rec.Domain)
+		if slices.Contains(domains, DomainSub{Domain: rec.Domain, Sub: rec.Subdomain}) { continue }
+		domains = append(domains, DomainSub{Domain: rec.Domain, Sub: rec.Subdomain})
 	}
 
 
@@ -211,7 +224,7 @@ func (p Porkbun) inSetDns(ctx context.Context, records []Record) error {
 
 	for _, domain := range domains {
 		wg.Add(1)
-		go func(ctx context.Context, domain string, records []Record, pbRecs []porkbun.Record) {
+		go func(ctx context.Context, domain DomainSub, records []Record, pbRecs []porkbun.Record) {
 			defer wg.Done()
 			p.inSetSingleName(
 				ctx,
@@ -242,13 +255,13 @@ func (p Porkbun) SetDns(ctx context.Context, records []Record) error {
 	}
 }
 
-func (p Porkbun) GetDns(ctx context.Context, hostnames []string) ([]Record, error) {
+func (p Porkbun) GetDns(ctx context.Context, domains []DomainSub) ([]Record, error) {
 	select {
 	case <-ctx.Done():
 		fmt.Println("Task cancelled")
 		return []Record{}, ctx.Err()
 	default:
-		pbRecs, err := p.inGetDns(ctx, hostnames)
+		pbRecs, err := p.inGetDns(ctx, domains)
 		if err != nil { return []Record{}, err }
 
 		var recs []Record

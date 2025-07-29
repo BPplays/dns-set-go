@@ -33,11 +33,20 @@ type Auth struct {
 	ApiSecretKey string
 }
 
+type DomainSub struct {
+	Domain string
+	Sub string
+}
+
+func (d DomainSub) full() string {
+	return d.Sub + "." + d.Domain
+}
+
 type DnsAPI interface {
 	SetAuth(Auth) DnsAPI
 
 	SetDns(context.Context, []Record) error
-	GetDns(context.Context, []string) ([]Record, error)
+	GetDns(context.Context, []DomainSub) ([]Record, error)
 	GetSuppoertedRecords() ([]string, error)
 }
 

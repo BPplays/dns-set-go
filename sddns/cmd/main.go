@@ -10,12 +10,19 @@ import (
 )
 
 func main() {
+	var ctx context.Context
+	var cancel context.CancelFunc
+
 	configLocation := flag.String("config_dir", sddns.ConfigLocationDefault, "")
-	timeout := flag.Int("timeout_sec", 25, "")
+	timeout := flag.Int("timeout_sec", -1, "")
 
 	flag.Parse()
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(*timeout) * time.Second)
+	if *timeout >= 0 {
+		ctx, cancel = context.WithTimeout(context.Background(), time.Duration(*timeout) * time.Second)
+	} else {
+		ctx, cancel = context.WithCancel(context.Background())
+	}
 	defer cancel()
 
 	log.Println("running sddns")
