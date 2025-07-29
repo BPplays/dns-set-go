@@ -247,7 +247,7 @@ func (p Porkbun) SetDns(ctx context.Context, records []Record) error {
 		fmt.Println("Task cancelled")
 		return ctx.Err()
 	default:
-		for i, _ := range records {
+		for i := range records {
 			records[i].SetDefaults()
 		}
 		return p.inSetDns(ctx, records)

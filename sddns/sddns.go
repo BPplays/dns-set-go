@@ -29,8 +29,8 @@ var (
 )
 
 
-type subDomain struct {
-    Domains           string   `yaml:"domain"`
+type subsDomain struct {
+    Domain           string   `yaml:"domain"`
     Subdomains           []string   `yaml:"sub_domains"`
 }
 
@@ -38,7 +38,7 @@ type subDomain struct {
 type Service struct {
     Name           string   `yaml:"name"`
     Type           string   `yaml:"type"`
-    Domains      []subDomain `yaml:"domains"`
+    Domains      []subsDomain `yaml:"domains"`
     IPv6Type       string   `yaml:"ipv6_type"`
     IPv6Interfaces []string `yaml:"ipv6_interfaces"`
     IPv4Type       string   `yaml:"ipv4_type"`
@@ -266,8 +266,7 @@ func setRecords(ctx context.Context, configs []Service) {
 			for _, subd := range domain.Subdomains {
 				for _, ip := range ips6 {
 					record := dnsSet.Record{
-						Domain: domain.Domains,
-						Subdomain: subd,
+						Domain: dnsSet.DomainSub{Domain: domain.Domain, Sub: subd},
 						Content: ip,
 						Type: "AAAA",
 						TTL: config.TTL,
@@ -278,8 +277,7 @@ func setRecords(ctx context.Context, configs []Service) {
 
 				for _, ip := range ips4 {
 					record := dnsSet.Record{
-						Domain: domain.Domains,
-						Subdomain: subd,
+						Domain: dnsSet.DomainSub{Domain: domain.Domain, Sub: subd},
 						Content: ip,
 						Type: "A",
 						TTL: config.TTL,
