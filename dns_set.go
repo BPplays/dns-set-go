@@ -9,8 +9,7 @@ var Providers = map[string]DnsAPI{
 
 
 type Record struct {
-	Domain    string
-	Subdomain    string
+	Domain    DomainSub
 	Disabled    bool
 	Type    string
 	Content string

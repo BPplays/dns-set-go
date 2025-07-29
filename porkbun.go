@@ -43,7 +43,7 @@ func IPv6ToReverseDNS(ip netip.Prefix) string {
 
 func recordsToDomains(r []Record) (domains []DomainSub) {
 	for _, rec := range r {
-		domains = append(domains, DomainSub{rec.Domain, rec.Subdomain})
+		domains = append(domains, rec.Domain)
 	}
 	return domains
 }
@@ -62,7 +62,7 @@ func (p Porkbun) inGetDns(ctx context.Context, domains []DomainSub) ([]pb_dom_re
                 return
             }
 
-            existingRecChan <- pb_dom_rec{domain.full(), recs}
+            existingRecChan <- pb_dom_rec{domain, recs}
         }(p, domain)
     }
 
@@ -80,7 +80,7 @@ func (p Porkbun) inGetDns(ctx context.Context, domains []DomainSub) ([]pb_dom_re
 
 func (p Porkbun) baseRecToPbRec(r Record) porkbun.Record {
 	return porkbun.Record{
-		Name: r.Subdomain,
+		Name: r.Domain.Sub,
 		Type: r.Type,
 		Content: r.Content,
 		TTL: r.TTL,
@@ -91,8 +91,7 @@ func (p Porkbun) baseRecToPbRec(r Record) porkbun.Record {
 
 func (p Porkbun) pbRecToBaseRec(domain string, r porkbun.Record) Record {
 	rec := Record{
-		Domain: domain,
-		Subdomain: r.Name,
+		Domain: DomainSub{Domain: domain, Sub: r.Name},
 		Type: r.Type,
 		Content: r.Content,
 		TTL: r.TTL,
@@ -118,7 +117,7 @@ func (p Porkbun) inSetSingleName(ctx context.Context, domain string, records []R
 
 	for _, rec := range records {
 		for _, eRec := range existingRecs.records {
-			if rec == p.pbRecToBaseRec(rec.Domain, eRec) { recExists[rec] = true; }
+			if rec == p.pbRecToBaseRec(rec.Domain.Domain, eRec) { recExists[rec] = true; }
 		}
 	}
 
@@ -133,7 +132,7 @@ func (p Porkbun) inSetSingleName(ctx context.Context, domain string, records []R
 	eRecMapCheck := make(map[Record]bool)
 
 	for _, eRec := range existingRecs.records {
-		eRecMapCheck[p.pbRecToBaseRec(existingRecs.domain, eRec)] = true
+		eRecMapCheck[p.pbRecToBaseRec(existingRecs.domain.Domain, eRec)] = true
 	}
 
 	log.Println("existing records:", existingRecs.records)
@@ -145,7 +144,7 @@ func (p Porkbun) inSetSingleName(ctx context.Context, domain string, records []R
 		pbRec := p.baseRecToPbRec(rec)
 
 		log.Printf("making record: %v, %v\n", rec.Domain, pbRec)
-		id, err := p.self.CreateRecord(ctx, rec.Domain, pbRec)
+		id, err := p.self.CreateRecord(ctx, rec.Domain.Domain, pbRec)
 		if err != nil {
 			log.Println(err)
 			return err
@@ -164,7 +163,7 @@ func (p Porkbun) inSetSingleName(ctx context.Context, domain string, records []R
 		}
 
 		log.Println("deleting")
-		err = p.self.DeleteRecord(ctx, existingRecs.domain, id)
+		err = p.self.DeleteRecord(ctx, existingRecs.domain.Domain, id)
 		if err != nil {
 			return err
 		}
@@ -202,21 +201,21 @@ func (p Porkbun) inSetDns(ctx context.Context, records []Record) error {
 	existingRecMap := make(map[string][]porkbun.Record)
 
 	for _, eRec := range existingRecs {
-		existingRecMap[eRec.domain] = append(existingRecMap[eRec.domain], eRec.records...)
+		existingRecMap[eRec.domain.full()] = append(existingRecMap[eRec.domain.full()], eRec.records...)
 	}
 
 	recMap := make(map[string][]Record)
 
 	for _, rec := range records {
-		recMap[rec.Domain] = append(recMap[rec.Domain], rec)
+		recMap[rec.Domain.full()] = append(recMap[rec.Domain.full()], rec)
 	}
 
 
 
 	var domains []DomainSub
 	for _, rec := range records {
-		if slices.Contains(domains, DomainSub{Domain: rec.Domain, Sub: rec.Subdomain}) { continue }
-		domains = append(domains, DomainSub{Domain: rec.Domain, Sub: rec.Subdomain})
+		if slices.Contains(domains, rec.Domain) { continue }
+		domains = append(domains, rec.Domain)
 	}
 
 
@@ -228,13 +227,13 @@ func (p Porkbun) inSetDns(ctx context.Context, records []Record) error {
 			defer wg.Done()
 			p.inSetSingleName(
 				ctx,
-				domain,
+				domain.Domain,
 				records,
 				pb_dom_rec{domain: domain, records: pbRecs},
 			)
 
 
-		}(ctx, domain, recMap[domain], existingRecMap[domain])
+		}(ctx, domain, recMap[domain.full()], existingRecMap[domain.full()])
 	}
 	wg.Wait()
 
@@ -267,7 +266,7 @@ func (p Porkbun) GetDns(ctx context.Context, domains []DomainSub) ([]Record, err
 		var recs []Record
 		for _, pdrec := range pbRecs {
 			for _, prec := range pdrec.records {
-				recs = append(recs, p.pbRecToBaseRec(pdrec.domain, prec))
+				recs = append(recs, p.pbRecToBaseRec(pdrec.domain.Domain, prec))
 			}
 		}
 
