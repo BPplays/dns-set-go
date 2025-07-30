@@ -62,7 +62,16 @@ func (p Porkbun) inGetDns(ctx context.Context, domains []DomainSub) ([]pb_dom_re
                 return
             }
 
-            existingRecChan <- pb_dom_rec{domain, recs}
+			finalRecs := []porkbun.Record{}
+			for _, rec := range recs {
+				if rec.Name != domain.full() { continue }
+				finalRecs = append(finalRecs, rec)
+			}
+
+			if len(finalRecs) > 0 {
+				existingRecChan <- pb_dom_rec{domain, finalRecs}
+			}
+
         }(p, domain)
     }
 
@@ -71,9 +80,10 @@ func (p Porkbun) inGetDns(ctx context.Context, domains []DomainSub) ([]pb_dom_re
         close(existingRecChan)
     }()
 
-    for rec := range existingRecChan {
-        pbRecs = append(pbRecs, rec)
-    }
+    for domRec := range existingRecChan {
+        pbRecs = append(pbRecs, domRec)
+	}
+
 
     return pbRecs, nil
 }
@@ -155,25 +165,26 @@ func (p Porkbun) inSetSingleName(ctx context.Context, domain string, records []R
 	}
 
 
-	i := len(existingRecs.records) - 1
-	for len(existingRecs.records) > len(records) {
-		id, err := strconv.Atoi(existingRecs.records[i].ID)
+	for i, rec := range existingRecs.records {
+		if len(existingRecs.records) <= len(records) {
+			break
+		}
+		id, err := strconv.Atoi(rec.ID)
 		if err != nil {
 			return err
 		}
 
-		log.Println("deleting")
+		log.Println("deleting", rec)
 		err = p.self.DeleteRecord(ctx, existingRecs.domain.Domain, id)
 		if err != nil {
 			return err
 		}
 		existingRecs.records = append(existingRecs.records[:i], existingRecs.records[i+1:]...)
-		i++
 
 	}
 
 	for _, rec := range records {
-		for _, eRec := range existingRecs.records {
+		for i, eRec := range existingRecs.records {
 			if !recExists[rec] {
 				id, err := strconv.Atoi(existingRecs.records[i].ID)
 				if err != nil { return err }
@@ -193,6 +204,10 @@ func (p Porkbun) inSetDns(ctx context.Context, records []Record) error {
 	if err != nil {
 		log.Println("error", err)
 	}
+
+	// for _, rec := range existingRecs {
+	//
+	// }
 
 
 	log.Println("all pbdomrecs:", existingRecs)

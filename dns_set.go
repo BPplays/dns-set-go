@@ -38,6 +38,8 @@ type DomainSub struct {
 }
 
 func (d DomainSub) full() string {
+	if d.Sub == "" { return d.Domain }
+	if d.Domain == "" { return d.Sub }
 	return d.Sub + "." + d.Domain
 }
 
