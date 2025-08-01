@@ -2,6 +2,7 @@ package dns_set
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net/netip"
@@ -20,6 +21,41 @@ type Porkbun struct {
 type pb_dom_rec struct {
 	domain DomainSub
 	records []porkbun.Record
+}
+
+type action struct {
+	action string
+	domain DomainSub
+	records []porkbun.Record
+}
+
+func (self action) SetAction(a string) error {
+	switch a {
+	case "create":
+		self.action = "create"
+		return nil
+	case "edit":
+		self.action = "edit"
+		return nil
+	case "delete":
+		self.action = "delete"
+		return nil
+	case "none":
+		self.action = "none"
+		return nil
+	}
+	return errors.ErrUnsupported
+}
+
+type actionMap map[string][]action
+
+func (self actionMap) contains(s string) bool {
+	for _, acts := range self {
+		for _, act := range acts {
+			if act.action == s { return true }
+		}
+	}
+	return false
 }
 
 func (p Porkbun) SetAuth(a Auth) DnsAPI {
@@ -197,6 +233,10 @@ func (p Porkbun) inSetSingleName(ctx context.Context, domain string, records []R
 	}
 
 	return nil
+}
+
+func (p Porkbun) getActions(ctx context.Context, records []Record) []action {
+
 }
 
 func (p Porkbun) inSetDns(ctx context.Context, records []Record) error {
