@@ -26,7 +26,7 @@ type pb_dom_rec struct {
 type action struct {
 	action string
 	domain DomainSub
-	records []porkbun.Record
+	record porkbun.Record
 }
 
 func (self action) SetAction(a string) error {
@@ -49,10 +49,27 @@ func (self action) SetAction(a string) error {
 
 type actionMap map[string][]action
 
-func (self actionMap) contains(s string) bool {
+func (self actionMap) init() {
+	self["create"] = []action{}
+	self["edit"] = []action{}
+	self["delete"] = []action{}
+	self["none"] = []action{}
+}
+
+func (self actionMap) containsID(s string) bool {
 	for _, acts := range self {
 		for _, act := range acts {
-			if act.action == s { return true }
+			if act.record.ID == s { return true }
+		}
+	}
+	return false
+}
+
+func (self actionMap) containsRecord(r Record) bool {
+	for _, acts := range self {
+		for _, act := range acts {
+			eRec := pbRecToBaseRec(act.domain, act.record)
+			if eRec == r { return true }
 		}
 	}
 	return false
@@ -124,7 +141,7 @@ func (p Porkbun) inGetDns(ctx context.Context, domains []DomainSub) ([]pb_dom_re
     return pbRecs, nil
 }
 
-func (p Porkbun) baseRecToPbRec(r Record) porkbun.Record {
+func baseRecToPbRec(r Record) porkbun.Record {
 	return porkbun.Record{
 		Name: r.Domain.Sub,
 		Type: r.Type,
@@ -135,9 +152,9 @@ func (p Porkbun) baseRecToPbRec(r Record) porkbun.Record {
 	}
 }
 
-func (p Porkbun) pbRecToBaseRec(domain string, r porkbun.Record) Record {
+func pbRecToBaseRec(domain DomainSub, r porkbun.Record) Record {
 	rec := Record{
-		Domain: DomainSub{Domain: domain, Sub: r.Name},
+		Domain: domain,
 		Type: r.Type,
 		Content: r.Content,
 		TTL: r.TTL,
@@ -146,6 +163,57 @@ func (p Porkbun) pbRecToBaseRec(domain string, r porkbun.Record) Record {
 	}
 	rec.SetDefaults()
 	return rec
+}
+
+func (p Porkbun) getActions(
+	ctx context.Context,
+	domain DomainSub,
+	records []Record,
+	existingRecs []pb_dom_rec,
+) actionMap {
+	actMap := make(actionMap)
+	actMap.init()
+
+	for _, rec := range records {
+		for _, eRecs := range existingRecs {
+			for _, eRec := range eRecs.records {
+				eRecBase := pbRecToBaseRec(eRecs.domain, eRec)
+				if rec == eRecBase {
+					actMap["none"] = append(
+						actMap["none"],
+						action{action: "none", domain: eRecs.domain, record: eRec},
+					)
+				}
+			}
+		}
+	}
+
+
+	existingRecsLen := 0
+	for _, eRecs := range existingRecs { for range eRecs.records { existingRecsLen += 1 } }
+
+	recDeficit := len(records) - existingRecsLen
+
+	if recDeficit > 0 {
+		for _, eRecs := range existingRecs {
+			if recDeficit == 0 { break }
+
+			for _, eRec := range eRecs.records {
+				if recDeficit == 0 { break }
+
+				if !actMap.containsID(eRec.ID) {
+					recDeficit -= 1
+					actMap["create"] = append(
+						actMap["create"],
+						action{action: "create", domain: eRecs.domain, record: eRec},
+						)
+				}
+			}
+		}
+	}
+
+
+	return actMap
 }
 
 func (p Porkbun) inSetSingleName(ctx context.Context, domain string, records []Record, existingRecs pb_dom_rec) error {
@@ -163,7 +231,7 @@ func (p Porkbun) inSetSingleName(ctx context.Context, domain string, records []R
 
 	for _, rec := range records {
 		for _, eRec := range existingRecs.records {
-			if rec == p.pbRecToBaseRec(rec.Domain.Domain, eRec) { recExists[rec] = true; }
+			if rec == pbRecToBaseRec(rec.Domain, eRec) { recExists[rec] = true; }
 		}
 	}
 
@@ -178,7 +246,7 @@ func (p Porkbun) inSetSingleName(ctx context.Context, domain string, records []R
 	eRecMapCheck := make(map[Record]bool)
 
 	for _, eRec := range existingRecs.records {
-		eRecMapCheck[p.pbRecToBaseRec(existingRecs.domain.Domain, eRec)] = true
+		eRecMapCheck[pbRecToBaseRec(existingRecs.domain, eRec)] = true
 	}
 
 	log.Println("existing records:", existingRecs.records)
@@ -187,7 +255,7 @@ func (p Porkbun) inSetSingleName(ctx context.Context, domain string, records []R
 		if len(existingRecs.records) >= len(records) {
 			break
 		}
-		pbRec := p.baseRecToPbRec(rec)
+		pbRec := baseRecToPbRec(rec)
 
 		log.Printf("making record: %v, %v\n", rec.Domain, pbRec)
 		id, err := p.self.CreateRecord(ctx, rec.Domain.Domain, pbRec)
@@ -233,10 +301,6 @@ func (p Porkbun) inSetSingleName(ctx context.Context, domain string, records []R
 	}
 
 	return nil
-}
-
-func (p Porkbun) getActions(ctx context.Context, records []Record) []action {
-
 }
 
 func (p Porkbun) inSetDns(ctx context.Context, records []Record) error {
@@ -321,7 +385,7 @@ func (p Porkbun) GetDns(ctx context.Context, domains []DomainSub) ([]Record, err
 		var recs []Record
 		for _, pdrec := range pbRecs {
 			for _, prec := range pdrec.records {
-				recs = append(recs, p.pbRecToBaseRec(pdrec.domain.Domain, prec))
+				recs = append(recs, pbRecToBaseRec(pdrec.domain, prec))
 			}
 		}
 
