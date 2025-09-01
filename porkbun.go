@@ -195,20 +195,14 @@ func (p Porkbun) getActions(
 	recDeficit := len(records) - existingRecsLen
 
 	if recDeficit > 0 {
-		for _, eRecs := range existingRecs {
+		for _, rec := range records {
 			if recDeficit == 0 { break }
 
-			for _, eRec := range eRecs.records {
-				if recDeficit == 0 { break }
-
-				if !actMap.containsID(eRec.ID) {
-					recDeficit -= 1
-					actMap["create"] = append(
-						actMap["create"],
-						action{action: "create", domain: eRecs.domain, record: eRec},
-						)
-				}
-			}
+			recDeficit -= 1
+			actMap["create"] = append(
+				actMap["create"],
+				action{action: "create", domain: rec.Domain, record: baseRecToPbRec(rec)},
+				)
 		}
 	}
 
